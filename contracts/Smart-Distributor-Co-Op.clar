@@ -8,6 +8,7 @@
 (define-constant err-already-distributed (err u106))
 (define-constant err-invalid-region (err u107))
 (define-constant err-unauthorized (err u108))
+(define-constant err-invalid-rank (err u109))
 
 (define-data-var total-members uint u0)
 (define-data-var treasury-balance uint u0)
@@ -52,6 +53,14 @@
     }
 )
 
+(define-map leaderboard
+    {period: uint, rank: uint}
+    {
+        member: principal,
+        sales: uint
+    }
+)
+
 (define-read-only (get-member (member principal))
     (map-get? members member)
 )
@@ -88,6 +97,38 @@
     (match (map-get? members account)
         member (get active member)
         false
+    )
+)
+
+(define-read-only (get-leaderboard-entry (period uint) (rank uint))
+    (map-get? leaderboard {period: period, rank: rank})
+)
+
+(define-read-only (get-member-rank (period uint) (member principal))
+    (let
+        (
+            (rank-1 (map-get? leaderboard {period: period, rank: u1}))
+            (rank-2 (map-get? leaderboard {period: period, rank: u2}))
+            (rank-3 (map-get? leaderboard {period: period, rank: u3}))
+            (rank-4 (map-get? leaderboard {period: period, rank: u4}))
+            (rank-5 (map-get? leaderboard {period: period, rank: u5}))
+        )
+        (if (and (is-some rank-1) (is-eq (get member (unwrap-panic rank-1)) member))
+            (some u1)
+            (if (and (is-some rank-2) (is-eq (get member (unwrap-panic rank-2)) member))
+                (some u2)
+                (if (and (is-some rank-3) (is-eq (get member (unwrap-panic rank-3)) member))
+                    (some u3)
+                    (if (and (is-some rank-4) (is-eq (get member (unwrap-panic rank-4)) member))
+                        (some u4)
+                        (if (and (is-some rank-5) (is-eq (get member (unwrap-panic rank-5)) member))
+                            (some u5)
+                            none
+                        )
+                    )
+                )
+            )
+        )
     )
 )
 
@@ -263,6 +304,15 @@
         )
         (asserts! (is-eq tx-sender contract-owner) err-owner-only)
         (map-set members member (merge member-data {active: true}))
+        (ok true)
+    )
+)
+
+(define-public (update-leaderboard (period uint) (rank uint) (member principal) (sales uint))
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+        (asserts! (and (>= rank u1) (<= rank u5)) err-invalid-rank)
+        (map-set leaderboard {period: period, rank: rank} {member: member, sales: sales})
         (ok true)
     )
 )
